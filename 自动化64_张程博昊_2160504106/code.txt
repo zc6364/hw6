@@ -1,0 +1,190 @@
+%%高斯噪音及椒盐噪音
+I = imread('0_FM_模糊.bmp');
+figure(1);
+subplot(1,2,1);
+imshow(I);
+title('未处理');
+I_noise = imnoise(I,'gaussian',0,0.01);
+subplot(1,2,2);
+imshow(I_noise);
+title('高斯噪声');
+imwrite(I_noise,'自己模糊高斯.bmp')
+
+
+% R = imnoise(I,'salt & pepper',0.1);
+% figure(2);
+% imshow(R);
+% imwrite(R,'2_椒盐.bmp')
+
+
+%%模糊滤波
+function [] = Fuzzy_filter(image,x)
+I = imread(image);
+if x==0
+    [row,column] = size(I);
+    P = 2*row;
+    Q = 2*column;
+    I_1 = zeros(P,Q);
+    I_1(1:row,1:column) = double(I);
+    % I_1 = double(I);
+    F = fftshift(fft2(I_1));
+    j = sqrt(-1);
+    a = 0.1;
+    b = 0.1;
+    T = 1;
+    for u = 1:P
+        for v = 1:Q
+            PSF(u,v) = T/(pi*(u*a+v*b))*sin(pi*(u*a+v*b))*exp(-j*pi*(u*a+v*b));
+        end
+    end
+    F_1 = F.*PSF;
+    F_1 = ifftshift(F_1);
+    F_1 = ifft2(F_1);
+    F_1 = 256.*F_1./max(max(F_1));
+    F_1 = uint8(real(F_1));
+    F_2 = F_1(1:row,1:column);
+    figure;
+    imshow(F_2);
+    %imwrite(F_2,'补0_FM_模糊.bmp')
+else
+    PSF = fspecial('motion',50,45);
+    I_m = imfilter(I,PSF,'circular','conv');
+    figure
+    imshow(I_m);
+    title('MATLAB处理');
+    imwrite(I_m,'M_模糊.bmp');
+end
+
+
+function [outputArg1,outputArg2] = Arithmetic_mean_filter(image)
+%算术均值滤波器
+I = imread(image);
+figure(2);
+imshow(I);
+title('lena加入gaussian噪声后(u=0，s^2=0.01).bmp');
+n = 5;  
+H = 1/n^2.*ones(n,n);
+I_1 = uint8(conv2(I,H,'same')); 
+figure(2);
+imshow(I_1); 
+title('算术均值滤波的结果（5x5）');
+imwrite(I_1,'2_五阶算术均值滤波器恢复.bmp')
+end
+
+function [outputArg1,outputArg2] = Harmonic_filter(image,n)
+%谐波均值滤波器
+I = imread(image);
+[row, column] = size(I);
+I1 = double(I);
+I2 = I1;
+for i = n:row-n+1
+    for j = n:column-n+1
+        %遍历每个点的四周
+        is=I2(i-n+1:1:i+n-1,j-n+1:1:j+n-1);
+        for u =i-n+1:i+n-1
+            for v = j-n+1:j+n-1
+                is(u-i+n,v-j+n)=1/is(u-i+n,v-j+n);
+            end
+        end
+        I_2(i,j)=numel(is)/sum(is(:));
+    end
+end
+figure
+imshow(uint8(I_2));
+imwrite(uint8(I_2),'谐波均值滤波器滤波器恢复.bmp')
+end
+
+
+
+function [outputArg1,outputArg2] = Inverse_harmonic_filter(image,n,Q)
+%逆谐波均值滤波器
+I = imread(image);
+[row, column] = size(I);
+I1 = double(I);
+I2 = I1;
+for i = n:row-n+1
+    for j = n:column-n+1
+        %遍历每个点的四周
+        R=I2(i-n+1:1:i+n-1,j-n+1:1:j+n-1);
+        for u =i-n+1:i+n-1
+            for v = j-n+1:j+n-1
+                R_1(u-i+n,v-j+n)=(R(u-i+n,v-j+n))^Q;
+                R_2(u-i+n,v-j+n)=(R(u-i+n,v-j+n))^(Q+1);
+            end
+        end
+        I_2(i,j)=sum(R_2(:))/sum(R_1(:));
+    end
+end
+figure;
+imshow(uint8(I_2));
+imwrite(uint8(I_2),'2_逆谐波均值滤波器滤波器恢复0.5.bmp')
+end
+
+function [outputArg1,outputArg2] = Median_filter(image,m)
+%几何均值滤波器
+I = imread(image);
+n = m;
+[row, column] = size(I);
+I1 = double(I);
+I2 = I1;
+for i = 1: row-n+1
+    for j = 1:column-n+1
+            mb = I1( i:(i+n-1),  j:(j+n-1) );
+            mb = mb(:);
+            mm = median(mb);
+            I2( i+(n-1)/2,  j+(n-1)/2 ) = mm;
+    end
+end
+figure(2);
+imshow(uint8(I2));  
+imwrite(uint8(I2),'2_三阶中值滤波器恢复.bmp')
+end
+
+function [] = Wiener_filter(image,K)
+%维纳滤波器
+g = imread(image);
+[row,column] = size(g);
+P = 2*row;
+Q = 2*column;
+g_1 = zeros(P,Q);
+g_1(1:row,1:column) = double(g);
+G = fftshift(fft2(g_1));
+j = sqrt(-1);
+a = 0.1;
+b = 0.1;
+T =1;
+for u = 1:P
+    for v = 1:Q
+        H(u,v) = T/(pi*(u*a+v*b))*sin(pi*(u*a+v*b))*exp(-j*pi*(u*a+v*b));
+        H_G(u,v) = 1/H(u,v)*abs(H(u,v))^2/(abs(H(u,v)) + K);
+    end
+end
+F = G.*H_G;
+F_1 = ifftshift(F);
+f_1 = ifft2(F_1);
+f_1 = 256.*f_1/max(max(f_1));
+f_1 = uint8(real(f_1));
+f = f_1(1:row,1:column);
+figure;
+subplot(1,2,1);
+imshow(g);
+subplot(1,2,2);
+imshow(f);
+end
+
+function [outputArg1,outputArg2] = Constrained_least_squares(image)
+%约束最小二乘法
+H = fspecial('motion',50,45);
+I = imread(image);
+Z = 0.0001;
+NoisePower = Z*numel(size(I));
+fr = deconvreg(I,H,NoisePower);
+figure(5);
+imshow(fr);
+
+end
+
+
+
+
+
